@@ -1,0 +1,12 @@
+**/.git
+**/.gitignore
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/emulator
+**/*.user
+**/*.suo
+
+Dockerfile*
+README.md

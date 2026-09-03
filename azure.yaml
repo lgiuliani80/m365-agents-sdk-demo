@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: agent-framework
+metadata:
+    template: azd-init@1.29.0
+services:
+    agent-framework:
+        project: .
+        host: containerapp
+        language: docker # dotnet
+        docker:
+            #remoteBuild: true
+            buildArgs:
+            - NUGET_PACKAGES_REPO=${NUGET_PACKAGES_REPO}
+
+resources:
+    agent-framework:
+        type: host.containerapp
+        port: 8080

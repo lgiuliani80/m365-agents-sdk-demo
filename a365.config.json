@@ -1,0 +1,9 @@
+{
+  "tenantId": "b2af5565-3e68-43ca-a008-d4b1dd3cee67",
+  "clientAppId": "869bad7d-923e-49cf-8cc6-bb02718dccee",
+  "agentIdentityDisplayName": "bot-agent365-weather Identity",
+  "agentBlueprintDisplayName": "bot-agent365-weather Blueprint",
+  "agentDescription": "bot-agent365-weather",
+  "aiTeammate": false,
+  "useBlueprint": true
+}

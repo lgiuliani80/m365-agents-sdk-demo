@@ -1,0 +1,7 @@
+.azure
+a365.generated.config.json
+emulator/
+bin
+obj
+appsettings.Test*.json
+*.log

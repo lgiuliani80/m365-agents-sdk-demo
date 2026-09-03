@@ -9,9 +9,10 @@ services:
         host: containerapp
         language: docker # dotnet
         docker:
-            #remoteBuild: true
+            remoteBuild: true
             buildArgs:
             - NUGET_PACKAGES_REPO=${NUGET_PACKAGES_REPO}
+            - DEFINE_CONSTANTS=${DEFINE_CONSTANTS}
 
 resources:
     agent-framework:

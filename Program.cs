@@ -3,7 +3,6 @@
 
 using AgentFrameworkWeather;
 using AgentFrameworkWeather.Agent;
-using Azure;
 using Azure.Identity;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.A365.Observability.Extensions.AgentFramework;
@@ -15,10 +14,12 @@ using Microsoft.Agents.Hosting.AspNetCore;
 using Microsoft.Agents.Storage;
 using Microsoft.Agents.Storage.Transcript;
 using Microsoft.Extensions.AI;
-using System.Diagnostics;
 using System.Reflection;
+using System.ClientModel;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var isAgents365Enabled = builder.Configuration["Agent365Observability"] != null;
 
 builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly());
 builder.Services.AddControllers();
@@ -27,7 +28,11 @@ builder.Services.AddHttpContextAccessor();
 
 // Configure defaults for Aspire dashboard
 builder.ConfigureOtelProviders();
-//TODO builder.AddA365Tracing(configure: config => config.WithAgentFramework());
+
+if (isAgents365Enabled)
+{
+    builder.AddA365Tracing(configure: config => config.WithAgentFramework());
+}
 
 builder.Logging.AddConsole();
 
@@ -49,7 +54,6 @@ builder.AddAgentDefaults()
 // Register IChatClient with correct types
 builder.Services.AddSingleton<IChatClient>(sp =>
 {
-
     var confSvc = sp.GetRequiredService<IConfiguration>();
     var endpoint = confSvc["AIServices:AzureOpenAI:Endpoint"] ?? string.Empty;
     var deployment = confSvc["AIServices:AzureOpenAI:DeploymentName"] ?? string.Empty;
@@ -64,36 +68,52 @@ builder.Services.AddSingleton<IChatClient>(sp =>
     // Convert endpoint to Uri
     var endpointUri = new Uri(endpoint);
 
-    var credential = new DefaultAzureCredential();
+    var client = confSvc["AIServices:AzureOpenAI:ApiKey"] is not null ?
+        new AzureOpenAIClient(endpointUri, new ApiKeyCredential(confSvc["AIServices:AzureOpenAI:ApiKey"]!)) :
+        new AzureOpenAIClient(endpointUri, new DefaultAzureCredential());
 
     // Create and return the AzureOpenAIClient's ChatClient
-    return new AzureOpenAIClient(endpointUri, credential).GetChatClient(deployment).AsIChatClient();
+    return client.GetChatClient(deployment).AsIChatClient();
 });
 
 // Add Agent 365 baggage to every turn and log conversations to transcript files.
-builder.Services.AddSingleton<Microsoft.Agents.Builder.IMiddleware[]>(
-[
-    //TODO new BaggageTurnMiddleware(),
-    new TranscriptLoggerMiddleware(new FileTranscriptLogger())
-]);
+builder.Services.AddSingleton(sp =>
+{
+    var confSvc = sp.GetRequiredService<IConfiguration>();
+    var logFolder = confSvc["ConversationLogFolder"];
+
+     var agentMiddlewares = new List<Microsoft.Agents.Builder.IMiddleware>();
+
+     if (isAgents365Enabled)
+     {
+         agentMiddlewares.Add(new BaggageTurnMiddleware());
+     }
+     if (!string.IsNullOrEmpty(logFolder))
+     {
+         agentMiddlewares.Add(new TranscriptLoggerMiddleware(new FileTranscriptLogger(logFolder)));
+     }
+
+    return agentMiddlewares.ToArray();
+});
 
 var app = builder.Build();
 
-// Log inbound requests before authentication runs. Never write bearer tokens to logs.
+#if LOG_REQUESTS
+// Log inbound requests before authentication runs. Use for debugging and development only. 
+// Do not use in production.
 app.Use(async (context, next) =>
 {
     var logger = context.RequestServices
         .GetRequiredService<ILoggerFactory>()
         .CreateLogger("RequestLogging");
-    var authorization = context.Request.Headers.Authorization.ToString();
     var stopwatch = Stopwatch.StartNew();
 
     logger.LogDebug(
-        "HTTP request {Method} {Path}{QueryString}; Authorization={Authorization}; TraceIdentifier={TraceIdentifier}",
+        "HTTP request {Method} {Path}{QueryString}; Headers={Headers}; TraceIdentifier={TraceIdentifier}",
         context.Request.Method,
         context.Request.Path,
         context.Request.QueryString,
-        authorization,
+        string.Join(';',context.Request.Headers.Select(x => $"[{x.Key}={x.Value}]")),
         context.TraceIdentifier);
 
     try
@@ -112,6 +132,7 @@ app.Use(async (context, next) =>
             context.TraceIdentifier);
     }
 });
+#endif
 
 // Add the authentication and authorization middleware to the request pipeline
 // (with routing enabled so the controllers below can be mapped).

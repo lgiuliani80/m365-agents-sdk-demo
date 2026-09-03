@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG NUGET_PACKAGES_REPO
+ARG DEFINE_CONSTANTS
 
 WORKDIR /src
 
@@ -14,6 +15,7 @@ RUN echo "Restore NuGet packages with ${NUGET_PACKAGES_REPO:-the configured/defa
 
 COPY . ./
 RUN dotnet publish AgentFrameworkWeather.csproj \
+    -p:DefineConstants=${DEFINE_CONSTANTS} \
     --configuration Release \
     --output /app/publish \
     --no-restore \

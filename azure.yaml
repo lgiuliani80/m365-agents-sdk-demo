@@ -8,6 +8,11 @@ infra:
     path: infra
     module: main
 hooks:
+    preprovision:
+        shell: pwsh
+        run: ./scripts/prepare-certificate.ps1
+        interactive: false
+        continueOnError: false
     postdeploy:
         shell: pwsh
         run: ./scripts/postdeploy.ps1

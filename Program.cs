@@ -177,7 +177,9 @@ app.MapHealthChecks("/health").AllowAnonymous();
 // Authorization is required automatically when AddAgentAuthorization enabled it above.
 app.MapDefaultAgentEndpoints();
 
-if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "Playground")
+if (app.Environment.IsDevelopment() || 
+    app.Environment.EnvironmentName == "Playground" || 
+    !app.Configuration.GetValue("TokenValidation:Enabled", true))
 {
     app.UseDeveloperExceptionPage();
     app.MapControllers().AllowAnonymous();

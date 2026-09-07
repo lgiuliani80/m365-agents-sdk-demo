@@ -16,9 +16,6 @@ param location string
 @description('Name of the resource group. Defaults to rg-<environmentName>.')
 param resourceGroupName string = 'rg-${environmentName}'
 
-@description('Object ID of the principal running azd provision (azd sets this automatically from AZURE_PRINCIPAL_ID). Granted Key Vault Secrets Officer so provisioning and the postprovision hook can manage secrets.')
-param principalId string = ''
-
 @allowed([
   'managedIdentity'
   'clientSecret'
@@ -47,12 +44,14 @@ param azureOpenAIDeploymentName string
 param openWeatherApiKey string = ''
 
 @secure()
-@description('Base64-encoded PFX certificate contents. Required only when botAuthenticationMode is "certificate".')
-param botCertificatePfxBase64 string = ''
+@description('PEM containing the X.509 certificate and matching unencrypted private key. Required only when botAuthenticationMode is "certificate".')
+param botCertificatePem string = ''
 
-@secure()
-@description('Password protecting the PFX certificate. Required only when botAuthenticationMode is "certificate".')
-param botCertificatePfxPassword string = ''
+@description('Base64-encoded public DER certificate extracted locally by the preprovision hook. Required only when botAuthenticationMode is "certificate".')
+param botCertificatePublicBase64 string = ''
+
+@description('Certificate thumbprint extracted locally by the preprovision hook. Required only when botAuthenticationMode is "certificate".')
+param botCertificateThumbprint string = ''
 
 @description('Initial container image deployed by provisioning. azd deploy overwrites this with the built image.')
 param containerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
@@ -68,7 +67,6 @@ var identityName = 'id-${resourceToken}'
 var logAnalyticsName = 'log-${resourceToken}'
 var appInsightsName = 'appi-${resourceToken}'
 var acrName = 'acr${resourceToken}'
-var keyVaultName = 'kv-${resourceToken}'
 var containerAppsEnvironmentName = 'cae-${resourceToken}'
 var containerAppName = 'ca-${resourceToken}'
 var botName = 'bot-${resourceToken}'
@@ -121,22 +119,6 @@ module azureOpenAIAccess 'modules/azure-openai-access.bicep' = {
   }
 }
 
-module keyvault 'modules/keyvault.bicep' = {
-  name: 'keyvault'
-  scope: resourceGroup(rg.name)
-  params: {
-    name: keyVaultName
-    location: location
-    tags: tags
-    tenantId: tenantId
-    containerAppPrincipalId: identity.outputs.principalId
-    deployerPrincipalId: principalId
-    botAuthenticationMode: botAuthenticationMode
-    certificatePfxBase64: botCertificatePfxBase64
-    certificatePfxPassword: botCertificatePfxPassword
-  }
-}
-
 // Microsoft Graph application/service principal for clientSecret/certificate modes.
 // Always deployed (with internal resources conditioned on the mode) so its
 // outputs are safely referenceable regardless of the selected mode.
@@ -146,10 +128,8 @@ module graphAuth 'modules/graphAuth.bicep' = {
   params: {
     displayName: graphAppDisplayName
     botAuthenticationMode: botAuthenticationMode
-    certificatePfxBase64: botCertificatePfxBase64
-    certificatePfxPassword: botCertificatePfxPassword
-    scriptIdentityId: identity.outputs.id
-    location: location
+    certificatePublicBase64: botCertificatePublicBase64
+    certificateThumbprintValue: botCertificateThumbprint
   }
 }
 
@@ -176,8 +156,7 @@ module containerapps 'modules/containerapps.bicep' = {
     azureOpenAIEndpoint: azureOpenAIEndpoint
     azureOpenAIDeploymentName: azureOpenAIDeploymentName
     openWeatherApiKey: openWeatherApiKey
-    pfxSecretUri: keyvault.outputs.pfxSecretUri
-    passwordSecretUri: keyvault.outputs.passwordSecretUri
+    certificatePem: botCertificatePem
   }
 }
 
@@ -209,8 +188,6 @@ output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = containerapps.outputs.contai
 output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = containerapps.outputs.containerAppsEnvironmentName
 output AZURE_CONTAINER_APP_NAME string = containerapps.outputs.containerAppName
 output AZURE_CONTAINER_APP_FQDN string = containerapps.outputs.containerAppFqdn
-output AZURE_KEY_VAULT_NAME string = keyvault.outputs.name
-output AZURE_KEY_VAULT_ENDPOINT string = keyvault.outputs.uri
 output AZURE_USER_ASSIGNED_IDENTITY_ID string = identity.outputs.id
 output AZURE_USER_ASSIGNED_IDENTITY_CLIENT_ID string = identity.outputs.clientId
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.appInsightsConnectionString

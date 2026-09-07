@@ -1,6 +1,6 @@
-// User-assigned managed identity used by the Container App for ACR pull,
-// Key Vault secret references, and (in managedIdentity bot auth mode) as the
-// Azure Bot Service application identity.
+// User-assigned managed identity used by the Container App for ACR pull and,
+// in managedIdentity bot auth mode, as the Azure Bot Service application
+// identity.
 
 @description('Name of the user-assigned managed identity.')
 param name string

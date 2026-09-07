@@ -106,4 +106,6 @@ Write-Host '  $agentConfig = Get-Content .\a365.generated.config.json -Raw | Con
 Write-Host '  $tenantId = az account show --query tenantId --output tsv'
 Write-Host "  agentsplayground --app-endpoint `"$azureAgentEndpoint`" --channel-id msteams --service-url `"`$ngrokUrl/_connector`" --client-id `$agentConfig.agenticAppId --client-secret `$agentConfig.agentBlueprintClientSecret --tenant-id `$tenantId"
 Write-Host ''
-Write-Host 'Note: the current CLI option is --service-url and the connector suffix is /_connector.'
+Write-Host 'NOTES:'
+Write-Host '  - Options --client-id, --client-secret, and --tenant-id can be omitted if TokenValidation__Enabled is set to false.'
+Write-Host '  - make sure to replace <NGROK_HTTPS_URL> with the actual HTTPS forwarding URL from ngrok.'

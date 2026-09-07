@@ -14,33 +14,20 @@ internal static class BotCertificateBootstrapper
             return;
         }
 
-        var pfxPath = configuration["BotAuthentication:Certificate:PfxPath"];
-        var passwordPath = configuration["BotAuthentication:Certificate:PasswordPath"];
+        var pemPath = configuration["BotAuthentication:Certificate:PemPath"];
 
-        if (string.IsNullOrWhiteSpace(pfxPath) || !File.Exists(pfxPath))
+        if (string.IsNullOrWhiteSpace(pemPath) || !File.Exists(pemPath))
         {
             throw new InvalidOperationException(
-                $"Certificate authentication requires a readable PFX file at '{pfxPath}'.");
+                $"Certificate authentication requires a readable PEM file at '{pemPath}'.");
         }
 
-        if (string.IsNullOrWhiteSpace(passwordPath) || !File.Exists(passwordPath))
+        using var clientCertificate = X509Certificate2.CreateFromPemFile(pemPath);
+        if (!clientCertificate.HasPrivateKey)
         {
             throw new InvalidOperationException(
-                $"Certificate authentication requires a readable password file at '{passwordPath}'.");
+                "The configured PEM does not contain an X.509 certificate with a matching unencrypted private key.");
         }
-
-        var pfxBytes = Convert.FromBase64String(File.ReadAllText(pfxPath));
-        var password = File.ReadAllText(passwordPath);
-        var certificates = new X509Certificate2Collection();
-        certificates.Import(
-            pfxBytes,
-            password,
-            X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
-
-        var clientCertificate = certificates
-            .OfType<X509Certificate2>()
-            .FirstOrDefault(certificate => certificate.HasPrivateKey)
-            ?? throw new InvalidOperationException("The configured PFX does not contain a certificate with a private key.");
 
         using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadWrite);

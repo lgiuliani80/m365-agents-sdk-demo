@@ -1,11 +1,11 @@
 // Azure Container Apps managed environment + Container App hosting the agent.
-// Configures the user-assigned managed identity for ACR pull and Key Vault
-// secret resolution, port 8080 external HTTPS ingress, /health probes, and
+// Configures the user-assigned managed identity for ACR pull, port 8080
+// external HTTPS ingress, /health probes, and
 // the environment variables required by the .NET configuration system
 // (double-underscore section separators) for TokenValidation, the
 // Connections:BotServiceConnection settings used by the Agents SDK, and (in
-// certificate mode) the BotAuthentication:Certificate:PfxPath/PasswordPath
-// keys read by BotCertificateBootstrapper in Program.cs.
+// certificate mode) the BotAuthentication:Certificate:PemPath key read by
+// BotCertificateBootstrapper in Program.cs.
 
 @description('Name of the Container App.')
 param containerAppName string
@@ -64,20 +64,17 @@ param azureOpenAIDeploymentName string
 @description('Optional OpenWeather API key.')
 param openWeatherApiKey string = ''
 
-@description('Key Vault secret URI for the PFX certificate. Only used when botAuthenticationMode is "certificate".')
-param pfxSecretUri string = ''
-
-@description('Key Vault secret URI for the PFX password. Only used when botAuthenticationMode is "certificate".')
-param passwordSecretUri string = ''
+@secure()
+@description('PEM containing the X.509 certificate and matching unencrypted private key. Only used when botAuthenticationMode is "certificate".')
+param certificatePem string = ''
 
 // Matches the file paths read by BotCertificateBootstrapper.Configure() in Program.cs:
-// BotAuthentication:Certificate:PfxPath / PasswordPath. The bootstrapper imports the
-// certificate into the current user's certificate store and self-populates
-// Connections:BotServiceConnection:Settings:CertThumbprint at startup, so no thumbprint
-// environment variable is required here.
+// BotAuthentication:Certificate:PemPath. The bootstrapper imports the certificate
+// into the current user's certificate store and self-populates
+// Connections:BotServiceConnection:Settings:CertThumbprint at startup, so no
+// thumbprint environment variable is required here.
 var certificateVolumeMountPath = '/mnt/secrets/bot-auth'
-var certificatePfxFileName = 'bot-certificate-pfx'
-var certificatePasswordFileName = 'bot-certificate-password'
+var certificatePemFileName = 'bot-certificate.pem'
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsWorkspaceName
@@ -177,12 +174,8 @@ var certificateEnv = [
     value: 'Certificate'
   }
   {
-    name: 'BotAuthentication__Certificate__PfxPath'
-    value: '${certificateVolumeMountPath}/${certificatePfxFileName}'
-  }
-  {
-    name: 'BotAuthentication__Certificate__PasswordPath'
-    value: '${certificateVolumeMountPath}/${certificatePasswordFileName}'
+    name: 'BotAuthentication__Certificate__PemPath'
+    value: '${certificateVolumeMountPath}/${certificatePemFileName}'
   }
 ]
 
@@ -214,14 +207,8 @@ var applicationSecrets = !empty(openWeatherApiKey) ? [
 
 var certificateSecrets = [
   {
-    name: 'bot-certificate-pfx'
-    keyVaultUrl: pfxSecretUri
-    identity: userAssignedIdentityId
-  }
-  {
-    name: 'bot-certificate-password'
-    keyVaultUrl: passwordSecretUri
-    identity: userAssignedIdentityId
+    name: 'bot-certificate-pem'
+    value: certificatePem
   }
 ]
 
@@ -234,12 +221,8 @@ var certificateVolumes = [
     storageType: 'Secret'
     secrets: [
       {
-        secretRef: 'bot-certificate-pfx'
-        path: certificatePfxFileName
-      }
-      {
-        secretRef: 'bot-certificate-password'
-        path: certificatePasswordFileName
+        secretRef: 'bot-certificate-pem'
+        path: certificatePemFileName
       }
     ]
   }

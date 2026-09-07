@@ -8,9 +8,6 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
-    "principalId": {
-      "value": "${AZURE_PRINCIPAL_ID}"
-    },
     "botAuthenticationMode": {
       "value": "${BOT_AUTHENTICATION_MODE=managedIdentity}"
     },
@@ -32,11 +29,14 @@
     "openWeatherApiKey": {
       "value": "${OPENWEATHER_API_KEY=}"
     },
-    "botCertificatePfxBase64": {
-      "value": "${BOT_CERTIFICATE_PFX_BASE64=}"
+    "botCertificatePem": {
+      "value": "${BOT_CERTIFICATE_PEM=}"
     },
-    "botCertificatePfxPassword": {
-      "value": "${BOT_CERTIFICATE_PFX_PASSWORD=}"
+    "botCertificatePublicBase64": {
+      "value": "${BOT_CERTIFICATE_PUBLIC_BASE64=}"
+    },
+    "botCertificateThumbprint": {
+      "value": "${BOT_CERTIFICATE_THUMBPRINT=}"
     }
   }
 }

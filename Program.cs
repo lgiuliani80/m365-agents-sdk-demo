@@ -3,6 +3,7 @@
 
 using AgentFrameworkWeather;
 using AgentFrameworkWeather.Agent;
+using Azure.Core;
 using Azure.Identity;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.A365.Observability.Extensions.AgentFramework;
@@ -22,7 +23,9 @@ var builder = WebApplication.CreateBuilder(args);
 var isAgents365Enabled = builder.Configuration["Agent365Observability"] != null;
 
 builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly());
+BotCertificateBootstrapper.Configure(builder.Configuration);
 builder.Services.AddControllers();
+builder.Services.AddHealthChecks();
 builder.Services.AddHttpClient("WebClient", client => client.Timeout = TimeSpan.FromSeconds(600));
 builder.Services.AddHttpContextAccessor();
 
@@ -58,19 +61,42 @@ builder.Services.AddSingleton<IChatClient>(sp =>
     var endpoint = confSvc["AIServices:AzureOpenAI:Endpoint"] ?? string.Empty;
     var deployment = confSvc["AIServices:AzureOpenAI:DeploymentName"] ?? string.Empty;
 
-    // Validate OpenWeatherAPI key. 
-    var openWeatherApiKey = confSvc["OpenWeatherApiKey"] ?? string.Empty;
-
     AssertionHelpers.ThrowIfNullOrEmpty(endpoint, "AIServices:AzureOpenAI:Endpoint configuration is missing and required.");
     AssertionHelpers.ThrowIfNullOrEmpty(deployment, "AIServices:AzureOpenAI:DeploymentName configuration is missing and required.");
-    AssertionHelpers.ThrowIfNullOrEmpty(openWeatherApiKey, "OpenWeatherApiKey configuration is missing and required.");
 
     // Convert endpoint to Uri
     var endpointUri = new Uri(endpoint);
 
-    var client = confSvc["AIServices:AzureOpenAI:ApiKey"] is not null ?
-        new AzureOpenAIClient(endpointUri, new ApiKeyCredential(confSvc["AIServices:AzureOpenAI:ApiKey"]!)) :
-        new AzureOpenAIClient(endpointUri, new DefaultAzureCredential());
+    AzureOpenAIClient client;
+    var apiKey = confSvc["AIServices:AzureOpenAI:ApiKey"];
+    if (!string.IsNullOrWhiteSpace(apiKey))
+    {
+        client = new AzureOpenAIClient(endpointUri, new ApiKeyCredential(apiKey));
+    }
+    else
+    {
+        TokenCredential credential;
+        if (builder.Environment.IsDevelopment())
+        {
+            credential = new DefaultAzureCredential();
+        }
+        else
+        {
+            var managedIdentityClientId =
+                confSvc["AZURE_CLIENT_ID"]
+                ?? confSvc["AIServices:AzureOpenAI:ManagedIdentityClientId"];
+            if (string.IsNullOrWhiteSpace(managedIdentityClientId))
+            {
+                throw new InvalidOperationException(
+                    "AZURE_CLIENT_ID (or AIServices:AzureOpenAI:ManagedIdentityClientId as an override) is required when API key authentication is disabled outside Development.");
+            }
+
+            credential = new ManagedIdentityCredential(
+                ManagedIdentityId.FromUserAssignedClientId(managedIdentityClientId));
+        }
+
+        client = new AzureOpenAIClient(endpointUri, credential);
+    }
 
     // Create and return the AzureOpenAIClient's ChatClient
     return client.GetChatClient(deployment).AsIChatClient();
@@ -113,7 +139,14 @@ app.Use(async (context, next) =>
         context.Request.Method,
         context.Request.Path,
         context.Request.QueryString,
-        string.Join(';',context.Request.Headers.Select(x => $"[{x.Key}={x.Value}]")),
+        string.Join(
+            ';',
+            context.Request.Headers.Select(x =>
+                x.Key.Equals("Authorization", StringComparison.OrdinalIgnoreCase)
+                || x.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase)
+                || x.Key.Equals("Set-Cookie", StringComparison.OrdinalIgnoreCase)
+                    ? $"[{x.Key}=REDACTED]"
+                    : $"[{x.Key}={x.Value}]")),
         context.TraceIdentifier);
 
     try
@@ -137,6 +170,7 @@ app.Use(async (context, next) =>
 // Add the authentication and authorization middleware to the request pipeline
 // (with routing enabled so the controllers below can be mapped).
 app.UseAgents(useRouting: true);
+app.MapHealthChecks("/health").AllowAnonymous();
 
 // Map the default agent endpoints: GET "/" and the agent message endpoints.
 // Authorization is required automatically when AddAgentAuthorization enabled it above.

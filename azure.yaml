@@ -3,6 +3,10 @@
 name: agent-framework
 metadata:
     template: azd-init@1.29.0
+infra:
+    provider: bicep
+    path: infra
+    module: main
 services:
     agent-framework:
         project: .
@@ -13,8 +17,9 @@ services:
             buildArgs:
             - NUGET_PACKAGES_REPO=${NUGET_PACKAGES_REPO}
             - DEFINE_CONSTANTS=${DEFINE_CONSTANTS}
-
-resources:
-    agent-framework:
-        type: host.containerapp
-        port: 8080
+hooks:
+    postprovision:
+        shell: pwsh
+        run: ./scripts/provision-client-secret.ps1
+        interactive: false
+        continueOnError: false

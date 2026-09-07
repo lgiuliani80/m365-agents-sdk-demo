@@ -132,7 +132,9 @@ namespace AgentFrameworkWeather.Agent
 
                     })
                 .AsBuilder()
-                .UseOpenTelemetry(sourceName: AgentsTelemetry.SourceName, (cfg) => cfg.EnableSensitiveData = true)
+                .UseOpenTelemetry(
+                    sourceName: AgentsTelemetry.SourceName,
+                    cfg => cfg.EnableSensitiveData = _configuration!.GetValue<bool>("Telemetry:EnableSensitiveData"))
                 .Build(); 
         }
 

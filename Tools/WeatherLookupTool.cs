@@ -49,7 +49,9 @@ namespace AgentFrameworkWeather.Tools
                 await turnContext.SendActivityAsync(MessageFactory.CreateMessageActivity().Text = $"Looking up the Current Weather in {location}").ConfigureAwait(false);
 
             var openAPIKey = configuration.GetValue("OpenWeatherApiKey", string.Empty);
-            Console.WriteLine(openAPIKey);
+            AssertionHelpers.ThrowIfNullOrEmpty(
+                openAPIKey,
+                "OpenWeatherApiKey configuration is required to retrieve weather data.");
             OpenWeatherMapService openWeather = new OpenWeatherMapService(openAPIKey);
             var openWeatherLocation = await openWeather.GetLocationByNameAsync(string.Format("{0},{1}", location, state));
             if (openWeatherLocation != null && openWeatherLocation.IsSuccess)
@@ -124,6 +126,9 @@ namespace AgentFrameworkWeather.Tools
             Console.WriteLine($"Looking up the Weather Forecast in {location}");
 
             var openAPIKey = configuration.GetValue("OpenWeatherApiKey", string.Empty);
+            AssertionHelpers.ThrowIfNullOrEmpty(
+                openAPIKey,
+                "OpenWeatherApiKey configuration is required to retrieve weather data.");
             OpenWeatherMapService openWeather = new OpenWeatherMapService(openAPIKey);
             var openWeatherLocation = await openWeather.GetLocationByNameAsync(string.Format("{0},{1}", location, state));
             if (openWeatherLocation != null && openWeatherLocation.IsSuccess)

@@ -17,6 +17,7 @@ using Microsoft.Agents.Storage.Transcript;
 using Microsoft.Extensions.AI;
 using System.Reflection;
 using System.ClientModel;
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,8 +52,8 @@ builder.Services.AddSingleton<IStorage, MemoryStorage>();
 builder.AddAgentDefaults()
     .AddAgent<WeatherAgent>()
     .AddAgentAuthorization(
-        b => b.AddAgentAspNetAuthentication(),
-        forceEnable: !(builder.Environment.IsDevelopment() || builder.Environment.EnvironmentName == "Playground"));
+        b => b.AddAgentAspNetAuthentication()
+    );
 
 // Register IChatClient with correct types
 builder.Services.AddSingleton<IChatClient>(sp =>

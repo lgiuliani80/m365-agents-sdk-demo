@@ -7,6 +7,16 @@ infra:
     provider: bicep
     path: infra
     module: main
+hooks:
+    postdeploy:
+        shell: pwsh
+        run: ./scripts/postdeploy.ps1
+    postprovision:
+        shell: pwsh
+        run: ./scripts/provision-client-secret.ps1
+        interactive: false
+        continueOnError: false
+
 services:
     agent-framework:
         project: .
@@ -17,9 +27,3 @@ services:
             buildArgs:
             - NUGET_PACKAGES_REPO=${NUGET_PACKAGES_REPO}
             - DEFINE_CONSTANTS=${DEFINE_CONSTANTS}
-hooks:
-    postprovision:
-        shell: pwsh
-        run: ./scripts/provision-client-secret.ps1
-        interactive: false
-        continueOnError: false
